@@ -117,7 +117,7 @@ static int gc_config_is_timestamp_never(const char *var)
 
 	if (!repo_config_get_value(the_repository, var, &value) && value) {
 		if (parse_expiry_date(value, &expire))
-			die(_("failed to parse '%s' value '%s'"), var, value);
+			die_(USER_ERROR, _("failed to parse '%s' value '%s'"), var, value);
 		return expire == 0;
 	}
 	return 0;
@@ -814,7 +814,7 @@ static int report_last_gc_error(void)
 		if (errno == ENOENT)
 			goto done;
 
-		ret = die_message_errno(_("cannot stat '%s'"), gc_log_path);
+		ret = die_message_errno_(INTERNAL_ERROR, _("cannot stat '%s'"), gc_log_path);
 		goto done;
 	}
 
@@ -823,14 +823,14 @@ static int report_last_gc_error(void)
 
 	len = strbuf_read_file(&sb, gc_log_path, 0);
 	if (len < 0)
-		ret = die_message_errno(_("cannot read '%s'"), gc_log_path);
+		ret = die_message_errno_(INTERNAL_ERROR, _("cannot read '%s'"), gc_log_path);
 	else if (len > 0) {
 		/*
 		 * A previous gc failed.  Report the error, and don't
 		 * bother with an automatic gc run since it is likely
 		 * to fail in the same way.
 		 */
-		warning(_("The last gc run reported the following. "
+		warning_(INTERNAL_ERROR, _("The last gc run reported the following. "
 			       "Please correct the root cause\n"
 			       "and remove %s\n"
 			       "Automatic cleanup will not be performed "
@@ -849,9 +849,9 @@ static int gc_foreground_tasks(struct maintenance_run_opts *opts,
 			       struct gc_config *cfg)
 {
 	if (cfg->pack_refs && maintenance_task_pack_refs(opts, cfg))
-		return error(FAILED_RUN, "pack-refs");
+		return error_(INTERNAL_ERROR, FAILED_RUN, "pack-refs");
 	if (cfg->prune_reflogs && maintenance_task_reflog_expire(opts, cfg))
-		return error(FAILED_RUN, "reflog");
+		return error_(INTERNAL_ERROR, FAILED_RUN, "reflog");
 	return 0;
 }
 
@@ -913,7 +913,7 @@ int cmd_gc(int argc,
 	gc_config(&cfg);
 
 	if (parse_expiry_date(cfg.gc_log_expire, &gc_log_expire_time))
-		die(_("failed to parse gc.logExpiry value %s"), cfg.gc_log_expire);
+		die_(USER_ERROR, _("failed to parse gc.logExpiry value %s"), cfg.gc_log_expire);
 
 	if (cfg.pack_refs < 0)
 		cfg.pack_refs = !is_bare_repository();
@@ -928,7 +928,7 @@ int cmd_gc(int argc,
 		cfg.prune_expire = xstrdup_or_null(prune_expire_arg);
 	}
 	if (cfg.prune_expire && parse_expiry_date(cfg.prune_expire, &dummy))
-		die(_("failed to parse prune expiry value %s"), cfg.prune_expire);
+		die_(USER_ERROR, _("failed to parse prune expiry value %s"), cfg.prune_expire);
 
 	if (aggressive) {
 		strvec_push(&repack_args, "-f");
@@ -992,7 +992,7 @@ int cmd_gc(int argc,
 			}
 
 			if (gc_foreground_tasks(&opts, &cfg) < 0)
-				die(NULL);
+				die_(INTERNAL_ERROR, NULL);
 			delete_tempfile(&pidfile);
 		}
 
@@ -1010,7 +1010,7 @@ int cmd_gc(int argc,
 			goto out; /* be quiet on --auto */
 		}
 
-		die(_("gc is already running on machine '%s' pid %"PRIuMAX" (use --force if not)"),
+		die_(USER_ERROR, _("gc is already running on machine '%s' pid %"PRIuMAX" (use --force if not)"),
 		    name, (uintmax_t)pid);
 	}
 
@@ -1033,7 +1033,7 @@ int cmd_gc(int argc,
 		repack_cmd.close_object_store = 1;
 		strvec_pushv(&repack_cmd.args, repack_args.v);
 		if (run_command(&repack_cmd))
-			die(FAILED_RUN, repack_args.v[0]);
+			die_(INTERNAL_ERROR, FAILED_RUN, repack_args.v[0]);
 
 		if (cfg.prune_expire) {
 			struct child_process prune_cmd = CHILD_PROCESS_INIT;
@@ -1049,16 +1049,16 @@ int cmd_gc(int argc,
 			prune_cmd.git_cmd = 1;
 
 			if (run_command(&prune_cmd))
-				die(FAILED_RUN, prune_cmd.args.v[0]);
+				die_(INTERNAL_ERROR, FAILED_RUN, prune_cmd.args.v[0]);
 		}
 	}
 
 	if (cfg.prune_worktrees_expire &&
 	    maintenance_task_worktree_prune(&opts, &cfg))
-		die(FAILED_RUN, "worktree");
+		die_(INTERNAL_ERROR, FAILED_RUN, "worktree");
 
 	if (maintenance_task_rerere_gc(&opts, &cfg))
-		die(FAILED_RUN, "rerere");
+		die_(INTERNAL_ERROR, FAILED_RUN, "rerere");
 
 	report_garbage = report_pack_garbage;
 	odb_reprepare(the_repository->objects);
@@ -1073,7 +1073,7 @@ int cmd_gc(int argc,
 					     NULL);
 
 	if (opts.auto_flag && too_many_loose_objects(cfg.gc_auto_threshold))
-		warning(_("There are too many unreachable loose objects; "
+		warning_(USER_ERROR, _("There are too many unreachable loose objects; "
 			"run 'git prune' to remove them."));
 
 	if (!daemonized) {
@@ -1100,12 +1100,12 @@ static int maintenance_opt_schedule(const struct option *opt, const char *arg,
 	enum schedule_priority *priority = opt->value;
 
 	if (unset)
-		die(_("--no-schedule is not allowed"));
+		die_(USER_ERROR, _("--no-schedule is not allowed"));
 
 	*priority = parse_schedule(arg);
 
 	if (!*priority)
-		die(_("unrecognized --schedule argument '%s'"), arg);
+		die_(USER_ERROR, _("unrecognized --schedule argument '%s'"), arg);
 
 	return 0;
 }
@@ -1217,7 +1217,7 @@ static int maintenance_task_commit_graph(struct maintenance_run_opts *opts,
 		return 0;
 
 	if (run_write_commit_graph(opts)) {
-		error(_("failed to write commit-graph"));
+		error_(INTERNAL_ERROR, _("failed to write commit-graph"));
 		return 1;
 	}
 
@@ -1248,7 +1248,7 @@ static int maintenance_task_prefetch(struct maintenance_run_opts *opts,
 				     struct gc_config *cfg UNUSED)
 {
 	if (for_each_remote(fetch_remote, opts)) {
-		error(_("failed to prefetch remotes"));
+		error_(INTERNAL_ERROR, _("failed to prefetch remotes"));
 		return 1;
 	}
 
@@ -1395,7 +1395,7 @@ static int pack_loose(struct maintenance_run_opts *opts)
 	pack_proc.out = -1;
 
 	if (start_command(&pack_proc)) {
-		error(_("failed to start 'git pack-objects' process"));
+		error_(INTERNAL_ERROR, _("failed to start 'git pack-objects' process"));
 		return 1;
 	}
 
@@ -1419,7 +1419,7 @@ static int pack_loose(struct maintenance_run_opts *opts)
 	fclose(data.in);
 
 	if (finish_command(&pack_proc)) {
-		error(_("failed to finish 'git pack-objects' process"));
+		error_(INTERNAL_ERROR, _("failed to finish 'git pack-objects' process"));
 		result = 1;
 	}
 
@@ -1473,7 +1473,7 @@ static int multi_pack_index_write(struct maintenance_run_opts *opts)
 		strvec_push(&child.args, "--progress");
 
 	if (run_command(&child))
-		return error(_("failed to write multi-pack-index"));
+		return error_(INTERNAL_ERROR, _("failed to write multi-pack-index"));
 
 	return 0;
 }
@@ -1491,7 +1491,7 @@ static int multi_pack_index_expire(struct maintenance_run_opts *opts)
 		strvec_push(&child.args, "--progress");
 
 	if (run_command(&child))
-		return error(_("'git multi-pack-index expire' failed"));
+		return error_(INTERNAL_ERROR, _("'git multi-pack-index expire' failed"));
 
 	return 0;
 }
@@ -1552,7 +1552,7 @@ static int multi_pack_index_repack(struct maintenance_run_opts *opts)
 				  (uintmax_t)get_auto_pack_size());
 
 	if (run_command(&child))
-		return error(_("'git multi-pack-index repack' failed"));
+		return error_(INTERNAL_ERROR, _("'git multi-pack-index repack' failed"));
 
 	return 0;
 }
@@ -1611,7 +1611,7 @@ static int maintenance_task_geometric_repack(struct maintenance_run_opts *opts,
 		strvec_push(&child.args, "--write-midx");
 
 	if (run_command(&child)) {
-		ret = error(_("failed to perform geometric repack"));
+		ret = error_(INTERNAL_ERROR, _("failed to perform geometric repack"));
 		goto out;
 	}
 
@@ -1781,7 +1781,7 @@ static int maybe_run_task(const struct maintenance_task *task,
 
 	trace2_region_enter(region, task->name, repo);
 	if (fn(opts, cfg)) {
-		error(_("task '%s' failed"), task->name);
+		error_(INTERNAL_ERROR, _("task '%s' failed"), task->name);
 		ret = 1;
 	}
 	trace2_region_leave(region, task->name, repo);
@@ -1806,7 +1806,7 @@ static int maintenance_run_tasks(struct maintenance_run_opts *opts,
 		 * that case.
 		 */
 		if (!opts->auto_flag && !opts->quiet)
-			warning(_("lock file '%s' exists, skipping maintenance"),
+			warning_(USER_ERROR, _("lock file '%s' exists, skipping maintenance"),
 				lock_path);
 		free(lock_path);
 		return 0;
@@ -1935,7 +1935,7 @@ static struct maintenance_strategy parse_maintenance_strategy(const char *name)
 		return gc_strategy;
 	if (!strcasecmp(name, "geometric"))
 		return geometric_strategy;
-	die(_("unknown maintenance strategy: '%s'"), name);
+	die_(USER_ERROR, _("unknown maintenance strategy: '%s'"), name);
 }
 
 static void initialize_task_config(struct maintenance_run_opts *opts,

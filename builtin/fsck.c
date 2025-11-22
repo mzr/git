@@ -85,10 +85,9 @@ static int objerror(struct object *obj, const char *err)
 {
 	errors_found |= ERROR_OBJECT;
 	/* TRANSLATORS: e.g. error in tree 01bfda: <more explanation> */
-	fprintf_ln(stderr, _("error in %s %s: %s"),
+	return error_(INTERNAL_ERROR, _("in %s %s: %s"),
 		   printable_type(&obj->oid, obj->type),
 		   describe_object(&obj->oid), err);
-	return -1;
 }
 
 static int fsck_objects_error_func(struct fsck_options *o UNUSED,
@@ -104,13 +103,13 @@ static int fsck_objects_error_func(struct fsck_options *o UNUSED,
 	switch (msg_type) {
 	case FSCK_WARN:
 		/* TRANSLATORS: e.g. warning in tree 01bfda: <more explanation> */
-		fprintf_ln(stderr, _("warning in %s %s: %s"),
+		warning_(INTERNAL_ERROR, _("in %s %s: %s"),
 			   printable_type(oid, object_type),
 			   describe_object(oid), message);
 		return 0;
 	case FSCK_ERROR:
 		/* TRANSLATORS: e.g. error in tree 01bfda: <more explanation> */
-		fprintf_ln(stderr, _("error in %s %s: %s"),
+		error_(INTERNAL_ERROR, _("in %s %s: %s"),
 			   printable_type(oid, object_type),
 			   describe_object(oid), message);
 		return 1;
@@ -334,18 +333,18 @@ static void check_unreachable_object(struct object *obj)
 			FILE *f;
 
 			if (safe_create_leading_directories_const(the_repository, filename)) {
-				error(_("could not create lost-found"));
+				error_(INTERNAL_ERROR, _("could not create lost-found"));
 				free(filename);
 				return;
 			}
 			f = xfopen(filename, "w");
 			if (obj->type == OBJ_BLOB) {
 				if (stream_blob_to_fd(fileno(f), &obj->oid, NULL, 1))
-					die_errno(_("could not write '%s'"), filename);
+					die_errno_(INTERNAL_ERROR, _("could not write '%s'"), filename);
 			} else
 				fprintf(f, "%s\n", describe_object(&obj->oid));
 			if (fclose(f))
-				die_errno(_("could not finish '%s'"),
+				die_errno_(INTERNAL_ERROR, _("could not finish '%s'"),
 					  filename);
 			free(filename);
 		}
@@ -471,7 +470,7 @@ static int fsck_obj_buffer(const struct object_id *oid, enum object_type type,
 				  eaten);
 	if (!obj) {
 		errors_found |= ERROR_OBJECT;
-		return error(_("%s: object corrupt or missing"),
+		return error_(INTERNAL_ERROR, _("%s: object corrupt or missing"),
 			     oid_to_hex(oid));
 	}
 	obj->flags &= ~(REACHABLE | SEEN);
@@ -496,7 +495,7 @@ static void fsck_handle_reflog_oid(const char *refname, struct object_id *oid,
 			obj->flags |= USED;
 			mark_object_reachable(obj);
 		} else if (!is_promisor_object(the_repository, oid)) {
-			error(_("%s: invalid reflog entry %s"),
+			error_(INTERNAL_ERROR, _("%s: invalid reflog entry %s"),
 			      refname, oid_to_hex(oid));
 			errors_found |= ERROR_REACHABLE;
 		}
@@ -544,14 +543,14 @@ static int fsck_handle_ref(const struct reference *ref, void *cb_data UNUSED)
 			 default_refs++;
 			 return 0;
 		}
-		error(_("%s: invalid sha1 pointer %s"),
+		error_(INTERNAL_ERROR, _("%s: invalid sha1 pointer %s"),
 		      ref->name, oid_to_hex(ref->oid));
 		errors_found |= ERROR_REACHABLE;
 		/* We'll continue with the rest despite the error.. */
 		return 0;
 	}
 	if (obj->type != OBJ_COMMIT && is_branch(ref->name)) {
-		error(_("%s: not a commit"), ref->name);
+		error_(INTERNAL_ERROR, _("%s: not a commit"), ref->name);
 		errors_found |= ERROR_REFS;
 	}
 	default_refs++;
@@ -639,10 +638,10 @@ static int fsck_loose(const struct object_id *oid, const char *path,
 
 	if (read_loose_object(the_repository, path, oid, &real_oid, &contents, &oi) < 0) {
 		if (contents && !oideq(&real_oid, oid))
-			err = error(_("%s: hash-path mismatch, found at: %s"),
+			err = error_(INTERNAL_ERROR, _("%s: hash-path mismatch, found at: %s"),
 				    oid_to_hex(&real_oid), path);
 		else
-			err = error(_("%s: object corrupt or missing: %s"),
+			err = error_(INTERNAL_ERROR, _("%s: object corrupt or missing: %s"),
 				    oid_to_hex(oid), path);
 	}
 	if (err < 0) {
@@ -659,7 +658,7 @@ static int fsck_loose(const struct object_id *oid, const char *path,
 
 	if (!obj) {
 		errors_found |= ERROR_OBJECT;
-		error(_("%s: object could not be parsed: %s"),
+		error_(INTERNAL_ERROR, _("%s: object could not be parsed: %s"),
 		      oid_to_hex(oid), path);
 		if (!eaten)
 			free(contents);
@@ -726,20 +725,20 @@ static int fsck_head_link(const char *head_ref_name,
 						  NULL);
 	if (!*head_points_at) {
 		errors_found |= ERROR_REFS;
-		return error(_("invalid %s"), head_ref_name);
+		return error_(INTERNAL_ERROR, _("invalid %s"), head_ref_name);
 	}
 	if (!strcmp(*head_points_at, head_ref_name))
 		/* detached HEAD */
 		null_is_error = 1;
 	else if (!starts_with(*head_points_at, "refs/heads/")) {
 		errors_found |= ERROR_REFS;
-		return error(_("%s points to something strange (%s)"),
+		return error_(INTERNAL_ERROR, _("%s points to something strange (%s)"),
 			     head_ref_name, *head_points_at);
 	}
 	if (is_null_oid(head_oid)) {
 		if (null_is_error) {
 			errors_found |= ERROR_REFS;
-			return error(_("%s: detached HEAD points at nothing"),
+			return error_(INTERNAL_ERROR, _("%s: detached HEAD points at nothing"),
 				     head_ref_name);
 		}
 		fprintf_ln(stderr,
@@ -760,7 +759,7 @@ static int fsck_cache_tree(struct cache_tree *it, const char *index_path)
 	if (0 <= it->entry_count) {
 		struct object *obj = parse_object(the_repository, &it->oid);
 		if (!obj) {
-			error(_("%s: invalid sha1 pointer in cache-tree of %s"),
+			error_(INTERNAL_ERROR, _("%s: invalid sha1 pointer in cache-tree of %s"),
 			      oid_to_hex(&it->oid), index_path);
 			errors_found |= ERROR_REFS;
 			return 1;
@@ -800,7 +799,7 @@ static int fsck_resolve_undo(struct index_state *istate,
 
 			obj = parse_object(the_repository, &ru->oid[i]);
 			if (!obj) {
-				error(_("%s: invalid sha1 pointer in resolve-undo of %s"),
+				error_(INTERNAL_ERROR, _("%s: invalid sha1 pointer in resolve-undo of %s"),
 				      oid_to_hex(&ru->oid[i]),
 				      index_path);
 				errors_found |= ERROR_REFS;
@@ -889,12 +888,12 @@ static int check_pack_rev_indexes(struct repository *r, int show_progress)
 		int load_error = load_pack_revindex_from_disk(p);
 
 		if (load_error < 0) {
-			error(_("unable to load rev-index for pack '%s'"), p->pack_name);
+			error_(INTERNAL_ERROR, _("unable to load rev-index for pack '%s'"), p->pack_name);
 			res = ERROR_PACK_REV_INDEX;
 		} else if (!load_error &&
 			   !load_pack_revindex(r, p) &&
 			   verify_pack_revindex(p)) {
-			error(_("invalid rev-index for pack '%s'"), p->pack_name);
+			error_(INTERNAL_ERROR, _("invalid rev-index for pack '%s'"), p->pack_name);
 			res = ERROR_PACK_REV_INDEX;
 		}
 		display_progress(progress, ++pack_count);
@@ -1050,7 +1049,7 @@ int cmd_fsck(int argc,
 			if (!obj || !(obj->flags & HAS_OBJ)) {
 				if (is_promisor_object(the_repository, &oid))
 					continue;
-				error(_("%s: object missing"), oid_to_hex(&oid));
+				error_(USER_ERROR, _("%s: object missing"), oid_to_hex(&oid));
 				errors_found |= ERROR_OBJECT;
 				continue;
 			}
@@ -1061,7 +1060,7 @@ int cmd_fsck(int argc,
 			mark_object_reachable(obj);
 			continue;
 		}
-		error(_("invalid parameter: expected sha1, got '%s'"), arg);
+		error_(USER_ERROR, _("invalid parameter: expected sha1, got '%s'"), arg);
 		errors_found |= ERROR_OBJECT;
 	}
 
