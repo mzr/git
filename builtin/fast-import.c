@@ -421,14 +421,14 @@ static void end_packfile(void);
 static void unkeep_all_packs(void);
 static void dump_marks(void);
 
-static NORETURN void die_nicely(const char *err, va_list params)
+static NORETURN void die_nicely(enum error_category category, const char *err, va_list params)
 {
 	va_list cp;
 	static int zombie;
 	report_fn die_message_fn = get_die_message_routine();
 
 	va_copy(cp, params);
-	die_message_fn(err, params);
+	die_message_fn(category, err, params);
 
 	if (!zombie) {
 		char message[2 * PATH_MAX];

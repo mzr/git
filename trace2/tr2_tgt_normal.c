@@ -142,7 +142,8 @@ static void maybe_append_string_va(struct strbuf *buf, const char *fmt,
 	}
 }
 
-static void fn_error_va_fl(const char *file, int line, const char *fmt,
+static void fn_error_va_fl(const char *file, int line,
+			   enum error_category category, const char *fmt,
 			   va_list ap)
 {
 	struct strbuf buf_payload = STRBUF_INIT;

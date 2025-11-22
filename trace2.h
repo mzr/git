@@ -38,6 +38,7 @@
 struct child_process;
 struct repository;
 struct json_writer;
+#include "error-category.h"
 
 /*
  * The public TRACE2 routines are grouped into the following groups:
@@ -112,11 +113,12 @@ void trace2_cmd_exit_fl(const char *file, int line, int code);
  *
  * Write an error message to the TRACE2 targets.
  */
-void trace2_cmd_error_va_fl(const char *file, int line, const char *fmt,
+void trace2_cmd_error_va_fl(const char *file, int line,
+			    enum error_category category, const char *fmt,
 			    va_list ap);
 
-#define trace2_cmd_error_va(fmt, ap) \
-	trace2_cmd_error_va_fl(__FILE__, __LINE__, (fmt), (ap))
+#define trace2_cmd_error_va(category, fmt, ap) \
+	trace2_cmd_error_va_fl(__FILE__, __LINE__, (category), (fmt), (ap))
 
 /*
  * Emit a 'pathname' event with the canonical pathname of the current process

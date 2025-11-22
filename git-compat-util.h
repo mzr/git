@@ -1,6 +1,8 @@
 #ifndef GIT_COMPAT_UTIL_H
 #define GIT_COMPAT_UTIL_H
 
+#include "error-category.h"
+
 #if __STDC_VERSION__ - 0 < 199901L
 /*
  * Git is in a testing period for mandatory C99 support in the compiler.  If
@@ -449,14 +451,22 @@ static inline int git_has_dir_sep(const char *path)
 /* General helper functions */
 NORETURN void usage(const char *err);
 NORETURN void usagef(const char *err, ...) __attribute__((format (printf, 1, 2)));
-NORETURN void die(const char *err, ...) __attribute__((format (printf, 1, 2)));
-NORETURN void die_errno(const char *err, ...) __attribute__((format (printf, 1, 2)));
-int die_message(const char *err, ...) __attribute__((format (printf, 1, 2)));
-int die_message_errno(const char *err, ...) __attribute__((format (printf, 1, 2)));
-int error(const char *err, ...) __attribute__((format (printf, 1, 2)));
-int error_errno(const char *err, ...) __attribute__((format (printf, 1, 2)));
-void warning(const char *err, ...) __attribute__((format (printf, 1, 2)));
-void warning_errno(const char *err, ...) __attribute__((format (printf, 1, 2)));
+NORETURN void die_(enum error_category category, const char *err, ...) __attribute__((format (printf, 2, 3)));
+#define die(...) die_(UNCATEGORIZED, __VA_ARGS__)
+NORETURN void die_errno_(enum error_category category, const char *err, ...) __attribute__((format (printf, 2, 3)));
+#define die_errno(...) die_errno_(UNCATEGORIZED, __VA_ARGS__)
+int die_message_(enum error_category category, const char *err, ...) __attribute__((format (printf, 2, 3)));
+#define die_message(...) die_message_(UNCATEGORIZED, __VA_ARGS__)
+int die_message_errno_(enum error_category category, const char *err, ...) __attribute__((format (printf, 2, 3)));
+#define die_message_errno(...) die_message_errno_(UNCATEGORIZED, __VA_ARGS__)
+int error_(enum error_category category, const char *err, ...) __attribute__((format (printf, 2, 3)));
+#define error(...) error_(UNCATEGORIZED, __VA_ARGS__)
+int error_errno_(enum error_category category, const char *err, ...) __attribute__((format (printf, 2, 3)));
+#define error_errno(...) error_errno_(UNCATEGORIZED, __VA_ARGS__)
+void warning_(enum error_category category, const char *err, ...) __attribute__((format (printf, 2, 3)));
+#define warning(...) warning_(UNCATEGORIZED, __VA_ARGS__)
+void warning_errno_(enum error_category category, const char *err, ...) __attribute__((format (printf, 2, 3)));
+#define warning_errno(...) warning_errno_(UNCATEGORIZED, __VA_ARGS__)
 
 void show_usage_if_asked(int ac, const char **av, const char *err);
 
@@ -486,11 +496,9 @@ static inline int const_error(void)
 {
 	return -1;
 }
-#define error(...) (error(__VA_ARGS__), const_error())
-#define error_errno(...) (error_errno(__VA_ARGS__), const_error())
 #endif
 
-typedef void (*report_fn)(const char *, va_list params);
+typedef void (*report_fn)(enum error_category, const char *, va_list params);
 
 void set_die_routine(NORETURN_PTR report_fn routine);
 report_fn get_die_message_routine(void);

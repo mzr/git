@@ -356,19 +356,19 @@ static void child_close_pair(int fd[2])
 	child_close(fd[1]);
 }
 
-static void child_error_fn(const char *err UNUSED, va_list params UNUSED)
+static void child_error_fn(enum error_category category, const char *err UNUSED, va_list params UNUSED)
 {
 	const char msg[] = "error() should not be called in child\n";
 	xwrite(2, msg, sizeof(msg) - 1);
 }
 
-static void child_warn_fn(const char *err UNUSED, va_list params UNUSED)
+static void child_warn_fn(enum error_category category, const char *err UNUSED, va_list params UNUSED)
 {
 	const char msg[] = "warn() should not be called in child\n";
 	xwrite(2, msg, sizeof(msg) - 1);
 }
 
-static void NORETURN child_die_fn(const char *err UNUSED, va_list params UNUSED)
+static void NORETURN child_die_fn(enum error_category category, const char *err UNUSED, va_list params UNUSED)
 {
 	const char msg[] = "die() should not be called in child\n";
 	xwrite(2, msg, sizeof(msg) - 1);
@@ -378,7 +378,7 @@ static void NORETURN child_die_fn(const char *err UNUSED, va_list params UNUSED)
 /* this runs in the parent process */
 static void child_err_spew(struct child_process *cmd, struct child_err *cerr)
 {
-	static void (*old_errfn)(const char *err, va_list params);
+	static report_fn old_errfn;
 	report_fn die_message_routine = get_die_message_routine();
 
 	old_errfn = get_error_routine();
@@ -1047,11 +1047,11 @@ static void *run_thread(void *data)
 	return (void *)ret;
 }
 
-static NORETURN void die_async(const char *err, va_list params)
+static NORETURN void die_async(enum error_category category, const char *err, va_list params)
 {
 	report_fn die_message_fn = get_die_message_routine();
 
-	die_message_fn(err, params);
+	die_message_fn(category, err, params);
 
 	if (in_async()) {
 		struct async *async = pthread_getspecific(async_key);

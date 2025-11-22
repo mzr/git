@@ -17,6 +17,7 @@
 #include "trace2/tr2_tgt.h"
 #include "trace2/tr2_tls.h"
 #include "trace2/tr2_tmr.h"
+#include "error-category.h"
 
 static int trace2_enabled;
 static int trace2_redact = 1;
@@ -376,7 +377,8 @@ void trace2_cmd_exit_fl(const char *file, int line, int code)
 					   code);
 }
 
-void trace2_cmd_error_va_fl(const char *file, int line, const char *fmt,
+void trace2_cmd_error_va_fl(const char *file, int line,
+			    enum error_category category, const char *fmt,
 			    va_list ap)
 {
 	struct tr2_tgt *tgt_j;
@@ -391,7 +393,7 @@ void trace2_cmd_error_va_fl(const char *file, int line, const char *fmt,
 	 */
 	for_each_wanted_builtin (j, tgt_j)
 		if (tgt_j->pfn_error_va_fl)
-			tgt_j->pfn_error_va_fl(file, line, fmt, ap);
+			tgt_j->pfn_error_va_fl(file, line, category, fmt, ap);
 }
 
 void trace2_cmd_path_fl(const char *file, int line, const char *pathname)

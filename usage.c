@@ -42,7 +42,7 @@ static void vreportf(const char *prefix, const char *err, va_list params)
 	vfreportf(stderr, prefix, err, params);
 }
 
-static NORETURN void usage_builtin(const char *err, va_list params)
+static NORETURN void usage_builtin(enum error_category category, const char *err, va_list params)
 {
 	vreportf(_("usage: "), err, params);
 
@@ -66,11 +66,11 @@ static NORETURN void usage_builtin(const char *err, va_list params)
 	exit(129);
 }
 
-static void die_message_builtin(const char *err, va_list params)
+static void die_message_builtin(enum error_category category, const char *err, va_list params)
 {
 	if (!err)
 		return;
-	trace2_cmd_error_va(err, params);
+	trace2_cmd_error_va(category, err, params);
 	vreportf(_("fatal: "), err, params);
 }
 
@@ -79,24 +79,24 @@ static void die_message_builtin(const char *err, va_list params)
  * expect it to va_copy 'params' before using it (because an 'ap' can
  * only be walked once).
  */
-static NORETURN void die_builtin(const char *err, va_list params)
+static NORETURN void die_builtin(enum error_category category, const char *err, va_list params)
 {
 	report_fn die_message_fn = get_die_message_routine();
 
-	die_message_fn(err, params);
+	die_message_fn(category, err, params);
 	exit(128);
 }
 
-static void error_builtin(const char *err, va_list params)
+static void error_builtin(enum error_category category, const char *err, va_list params)
 {
-	trace2_cmd_error_va(err, params);
+	trace2_cmd_error_va(category, err, params);
 
 	vreportf(_("error: "), err, params);
 }
 
-static void warn_builtin(const char *warn, va_list params)
+static void warn_builtin(enum error_category category, const char *warn, va_list params)
 {
-	trace2_cmd_error_va(warn, params);
+	trace2_cmd_error_va(category, warn, params);
 
 	vreportf(_("warning: "), warn, params);
 }
@@ -172,7 +172,7 @@ void NORETURN usagef(const char *err, ...)
 	va_list params;
 
 	va_start(params, err);
-	usage_routine(err, params);
+	usage_routine(UNCATEGORIZED, err, params);
 	va_end(params);
 }
 
@@ -198,7 +198,7 @@ void show_usage_if_asked(int ac, const char **av, const char *err)
 		show_usage_if_asked_helper(err);
 }
 
-void NORETURN die(const char *err, ...)
+void NORETURN die_(enum error_category category, const char *err, ...)
 {
 	va_list params;
 
@@ -208,7 +208,7 @@ void NORETURN die(const char *err, ...)
 	}
 
 	va_start(params, err);
-	die_routine(err, params);
+	die_routine(category, err, params);
 	va_end(params);
 }
 
@@ -236,7 +236,7 @@ static const char *fmt_with_err(char *buf, int n, const char *fmt)
 	return buf;
 }
 
-void NORETURN die_errno(const char *fmt, ...)
+void NORETURN die_errno_(enum error_category category, const char *fmt, ...)
 {
 	char buf[1024];
 	va_list params;
@@ -248,72 +248,72 @@ void NORETURN die_errno(const char *fmt, ...)
 	}
 
 	va_start(params, fmt);
-	die_routine(fmt_with_err(buf, sizeof(buf), fmt), params);
+	die_routine(category, fmt_with_err(buf, sizeof(buf), fmt), params);
 	va_end(params);
 }
 
 #undef die_message
-int die_message(const char *err, ...)
+int die_message_(enum error_category category, const char *err, ...)
 {
 	va_list params;
 
 	va_start(params, err);
-	die_message_routine(err, params);
+	die_message_routine(category, err, params);
 	va_end(params);
 	return 128;
 }
 
 #undef die_message_errno
-int die_message_errno(const char *fmt, ...)
+int die_message_errno_(enum error_category category, const char *fmt, ...)
 {
 	char buf[1024];
 	va_list params;
 
 	va_start(params, fmt);
-	die_message_routine(fmt_with_err(buf, sizeof(buf), fmt), params);
+	die_message_routine(category, fmt_with_err(buf, sizeof(buf), fmt), params);
 	va_end(params);
 	return 128;
 }
 
 #undef error_errno
-int error_errno(const char *fmt, ...)
+int error_errno_(enum error_category category, const char *fmt, ...)
 {
 	char buf[1024];
 	va_list params;
 
 	va_start(params, fmt);
-	error_routine(fmt_with_err(buf, sizeof(buf), fmt), params);
+	error_routine(category, fmt_with_err(buf, sizeof(buf), fmt), params);
 	va_end(params);
 	return -1;
 }
 
 #undef error
-int error(const char *err, ...)
+int error_(enum error_category category, const char *err, ...)
 {
 	va_list params;
 
 	va_start(params, err);
-	error_routine(err, params);
+	error_routine(category, err, params);
 	va_end(params);
 	return -1;
 }
 
-void warning_errno(const char *warn, ...)
+void warning_errno_(enum error_category category, const char *warn, ...)
 {
 	char buf[1024];
 	va_list params;
 
 	va_start(params, warn);
-	warn_routine(fmt_with_err(buf, sizeof(buf), warn), params);
+	warn_routine(category, fmt_with_err(buf, sizeof(buf), warn), params);
 	va_end(params);
 }
 
-void warning(const char *warn, ...)
+void warning_(enum error_category category, const char *warn, ...)
 {
 	va_list params;
 
 	va_start(params, warn);
-	warn_routine(warn, params);
+	warn_routine(category, warn, params);
 	va_end(params);
 }
 
@@ -343,7 +343,7 @@ static NORETURN void BUG_vfl(const char *file, int line, const char *fmt, va_lis
 		abort();
 	in_bug = 1;
 
-	trace2_cmd_error_va(fmt, params_copy);
+	trace2_cmd_error_va(INTERNAL_ERROR, fmt, params_copy);
 
 	if (BUG_exit_code)
 		exit(BUG_exit_code);
@@ -373,7 +373,7 @@ void bug_fl(const char *file, int line, const char *fmt, ...)
 	va_end(ap);
 
 	va_start(ap, fmt);
-	trace2_cmd_error_va(fmt, ap);
+	trace2_cmd_error_va(INTERNAL_ERROR, fmt, ap);
 	va_end(ap);
 }
 

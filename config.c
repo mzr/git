@@ -2518,7 +2518,7 @@ void git_die_config(struct repository *r, const char *key, const char *err, ...)
 	if (err) {
 		va_list params;
 		va_start(params, err);
-		error_fn(err, params);
+		error_fn(USER_ERROR, err, params);
 		va_end(params);
 	}
 	if (repo_config_get_value_multi(r, key, &values))

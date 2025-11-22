@@ -9,6 +9,8 @@ struct tr2_timer;
 struct tr2_counter_metadata;
 struct tr2_counter;
 
+#include "error-category.h"
+
 #define NS_TO_SEC(ns) ((double)(ns) / 1.0e9)
 
 /*
@@ -29,6 +31,7 @@ typedef void(tr2_tgt_evt_signal_t)(uint64_t us_elapsed_absolute, int signo);
 typedef void(tr2_tgt_evt_atexit_t)(uint64_t us_elapsed_absolute, int code);
 
 typedef void(tr2_tgt_evt_error_va_fl_t)(const char *file, int line,
+					enum error_category category,
 					const char *fmt, va_list ap);
 
 typedef void(tr2_tgt_evt_command_path_fl_t)(const char *file, int line,

@@ -13,6 +13,7 @@
 #include "trace2/tr2_tgt.h"
 #include "trace2/tr2_tls.h"
 #include "trace2/tr2_tmr.h"
+#include "error-category.h"
 
 static struct tr2_dst tr2dst_event = {
 	.sysenv_var = TR2_SYSENV_EVENT,
@@ -230,14 +231,30 @@ static void maybe_add_string_va(struct json_writer *jw, const char *field_name,
 	}
 }
 
-static void fn_error_va_fl(const char *file, int line, const char *fmt,
+static void fn_error_va_fl(const char *file, int line,
+			   enum error_category category, const char *fmt,
 			   va_list ap)
 {
 	const char *event_name = "error";
 	struct json_writer jw = JSON_WRITER_INIT;
+	const char *category_str;
+
+	switch (category) {
+	case USER_ERROR:
+		category_str = "user";
+		break;
+	case INTERNAL_ERROR:
+		category_str = "internal";
+		break;
+	case UNCATEGORIZED:
+	default:
+		category_str = "uncategorized";
+		break;
+	}
 
 	jw_object_begin(&jw, 0);
 	event_fmt_prepare(event_name, file, line, NULL, &jw);
+	jw_object_string(&jw, "category", category_str);
 	maybe_add_string_va(&jw, "msg", fmt, ap);
 	/*
 	 * Also emit the format string as a field in case
